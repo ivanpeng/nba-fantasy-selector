@@ -1,0 +1,8 @@
+This is a todo list of functionalities to implement for this fantasy basketball
+ - implement matchday tools for comparison
+ 	- select top 10 players, and see what stats need to be pushed up.
+ - get data in from 2012
+ 	- player behavioural changes in stats from previous years
+ - modify stats to implement pace, and compare against other advanced stats
+ - machine learning for best metrics
+ - player acquisitions; 
