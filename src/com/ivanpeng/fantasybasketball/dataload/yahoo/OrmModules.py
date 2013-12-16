@@ -3,13 +3,12 @@ Created on 2013-12-06
 
 @author: ivan
 '''
-from sqlalchemy import create_engine
-from sqlalchemy import ForeignKey
-from sqlalchemy import Column, Integer, String, Float, Boolean, Date
+import logging
+from sqlalchemy import Column, Integer, String, Float, Boolean, Date, ForeignKey, \
+    create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, backref
-
-import logging
+from sqlalchemy.orm import sessionmaker
 
 # Linux has user/pw of root/<blank> while windows is ivan/watershipdown
 engine = create_engine("mysql+mysqldb://root:@localhost", echo=True)
@@ -54,7 +53,7 @@ class Player(Base):
     yahooID = Column(Integer)
     positions = Column(String(15), nullable = False)
     # One to many relationship
-    player_stats = relationship("Stats")
+    #player_stats = relationship("Stats")
     team_id = Column(Integer, ForeignKey("NBATeam.id"))
     team = relationship("NBATeam")
     
@@ -66,11 +65,12 @@ The bread and butter of this class. I envision this to be a flat-table like stru
 game is pulled. This provides the backbone for analysis in statistical deviations.
 Identifiers to distinguish data: Year, length of stat (daily, weekly, season), date of game (if applicable), stat type (total, per game, per 48 mins, per 36 mins), 
 '''
+
 class Stats(Base):
     __tablename__ = 'NBA_Stats'
-    id = Column(Integer, foreign_key="Player.id")
+    id = Column(Integer, primary_key = True)
+    player_id = Column(Integer, ForeignKey("Player.id"))
     player = relationship("Player")
-    
     # Configuration stats first: identify this stats column
     year = Column(Integer, nullable=False) 
     # Daily stat, weekly stat, or season-long stat
@@ -108,3 +108,16 @@ class Stats(Base):
         return "Stats object for " + str(self.player)
     
 Base.metadata.create_all(engine)
+
+class EntityManager:
+    def __init__(self):
+        Session = sessionmaker(bind=engine)
+        self.cur = Session()
+    
+    def addObjectList(self, objList):
+        self.cur.addall(objList)
+        self.cur.commit()
+    
+    def addObject(self, obj):
+        self.cur.add(obj)
+        self.cur.commit()
