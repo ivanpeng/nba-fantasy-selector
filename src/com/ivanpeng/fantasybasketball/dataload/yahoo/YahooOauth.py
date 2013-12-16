@@ -6,8 +6,10 @@ Created on 2013-12-05
 @author: ivan
 '''
 
+import time
 from rauth import OAuth1Service
 import urllib2
+
 
 class YahooOAuthException(Exception): pass
 
@@ -40,7 +42,7 @@ class YahooOAuth():
             pin = raw_input('Enter PIN from your browser: ' )
             # Enter pin
             self.session = self.yahoo.get_auth_session(request_token, request_token_secret, data={'oauth_verifier': pin})
-        except:
+        except YahooOAuthException:
             print "Error caught. Please check stack trace"
         
     def sanityCheck(self):

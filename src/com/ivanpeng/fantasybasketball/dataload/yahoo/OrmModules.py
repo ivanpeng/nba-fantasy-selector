@@ -4,21 +4,24 @@ Created on 2013-12-06
 @author: ivan
 '''
 from sqlalchemy import create_engine
+from sqlalchemy import ForeignKey
 from sqlalchemy import Column, Integer, String, Float, Boolean, Date
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, backref
 
 import logging
 
-# Does engine create a new DB?
-engine = create_engine("mysql+mysqldb://ivan:watershipdown@localhost/nba_db2", echo=True)
+# Linux has user/pw of root/<blank> while windows is ivan/watershipdown
+engine = create_engine("mysql+mysqldb://root:@localhost", echo=True)
+engine.execute("CREATE DATABASE IF NOT EXISTS nba_db2")
+engine.execute("USE nba_db2")
 Base = declarative_base()
 logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 
 class FantasyLeague(Base):
     __tablename__ = 'FantasyLeague'
     id = Column(Integer, primary_key = True)
-    league_name = Column(String, nullable=False)
+    league_name = Column(String(50), nullable=False)
     
     def __repr__(self):
         return "Fantasy League: "  + self.league_name
@@ -26,9 +29,9 @@ class FantasyLeague(Base):
 class FantasyTeam(Base):
     __tablename__ = 'FantasyTeam'
     team_id = Column(Integer, primary_key = True)
-    league_id = Column(Integer, foreign_key = 'FantasyLeague.id')
+    league_id = Column(Integer, ForeignKey('FantasyLeague.id'))
     league = relationship("FantasyLeague")
-    player_id = Column(Integer, foreign_key = 'Player.id')
+    player_id = Column(Integer, ForeignKey('Player.id'))
     player = relationship("Player")
 
     def __repr__(self):
@@ -37,22 +40,22 @@ class FantasyTeam(Base):
 class NBATeam(Base):
     __tablename__ = 'NBATeam'
     id = Column(Integer, primary_key=True)
-    name = Column(String, nullable = False)
+    name = Column(String(100), nullable = False)
     isPlayoffTeam = Column(Boolean)
     
     def __repr__(self):
-        return self.team
+        return self.name
 
 class Player(Base):
     __tablename__ = 'Player'
     id = Column(Integer, primary_key = True, nullable = False)
-    name = Column(String, nullable = False)
+    name = Column(String(100), nullable = False)
     # Do we want YahooId to be referencing Yahoo Tables?
     yahooID = Column(Integer)
-    positions = Column(String, nullable = False)
+    positions = Column(String(15), nullable = False)
     # One to many relationship
     player_stats = relationship("Stats")
-    team_id = Column(Integer, foreign_key = "NBATeam.id")
+    team_id = Column(Integer, ForeignKey("NBATeam.id"))
     team = relationship("NBATeam")
     
     def __repr__(self):
@@ -76,10 +79,16 @@ class Stats(Base):
     gameDate = Column(Date)
     typeStat = Column(Integer, nullable=False)
     
+    gp = Column(Float, nullable=False)
+    gs = Column(Float, nullable=False)
+    mp = Column(Float, nullable=False)
     
     fgm = Column(Float, nullable = False)
     fga = Column(Float, nullable = False)
-    fgp = Column(Float, nullable = False)    
+    fgp = Column(Float, nullable = False)
+    fta = Column(Float, nullable = False)
+    ftm = Column(Float, nullable = False)
+    ftp = Column(Float, nullable = False) 
     fgm3 = Column(Float, nullable = False)
     fga3 = Column(Float, nullable = False)
     fgp3 = Column(Float, nullable = False)
@@ -97,3 +106,5 @@ class Stats(Base):
     
     def __repr__(self):
         return "Stats object for " + str(self.player)
+    
+Base.metadata.create_all(engine)

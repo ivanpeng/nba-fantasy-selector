@@ -7,6 +7,8 @@ from YahooOauth import YahooOAuth
 from OrmModules import Player, FantasyLeague, FantasyTeam, NBATeam, Stats
 import xml.etree.ElementTree as ET
 
+key_prefix = "{http://fantasysports.yahooapis.com/fantasy/v2/base.rng}"
+
 # Base class for scraping data off Yahoo Fantasy Basketball API
 class NBAScrapeBase:
     session = YahooOAuth().session
@@ -53,9 +55,27 @@ class NBAPeriodicScrape(NBAScrapeBase):
         r = self.session.get(player_list_url)
         root = ET.fromstring(r.text)
         player_list = root[0][7]
+        
+        # Yahoo ids are prefixed with this; append to every search
         for player in player_list:
             # Get player elements here, and create Player object
-            p = Player(name = player.find('name'), yahooID = player.find('player_id'), name = player.find('name').find('full'),
+            playerName = player.find(key_prefix+"name").find(key_prefix+"full").text
+            playerYahooID = player.find(key_prefix+"player_id").text
+            playerPositions = [x.text for x in player.find(key_prefix+"eligible_positions").findall(key_prefix+"position")]
+            # Possibly need to join playerpositions to string
+            playerPositionsStr = ",".join(playerPositions)
+            
+            playerTeam = player.find(key_prefix+"editorial_team_full_name").text
+            
+            # Now stats object
+            pStatsObj = self.getPlayerStats(player) 
+             
+            p = Player(name = player.find(key_prefix +'name'), yahooID = player.find('player_id'), name = player.find('name').find('full'),
                        stats = player.find('stats').find('stat'))
-            pass
+            # TODO: write player to DB now
     
+    def getPlayerStats(self,playerXml):
+        # Get player stat object via stat template
+        statsXml = playerXml.find(key_prefix+"player_stats").find(key_prefix+"stats").findall(key_prefix+"stat")
+        # There is a mapper; each stat is identified by the stat category
+        

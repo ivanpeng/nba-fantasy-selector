@@ -14,7 +14,10 @@ def getReader(filename):
     return reader;
             
 def getDbConnection():
+    # Windows
     db = MySQLdb.connect(host="localhost", user="ivan", passwd="watershipdown", db="nba_db")
+    #Linux; db hasn't been created yet
+    db = MySQLdb.connect(host="localhost", user="root", passwd="", db="nba_db")
     return db
 
 def loadTable(db, data, tablename):
