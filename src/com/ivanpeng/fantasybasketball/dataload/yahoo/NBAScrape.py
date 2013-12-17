@@ -10,9 +10,6 @@ import xml.etree.ElementTree as ET
 
 key_prefix = "{http://fantasysports.yahooapis.com/fantasy/v2/base.rng}"
 
-def getNBAData():
-    nbascrape = NBAPeriodicScrape()
-
 # Base class for scraping data off Yahoo Fantasy Basketball API
 class NBAScrapeBase(object):
     session = None
@@ -43,18 +40,13 @@ class NBAScrapeBase(object):
                       "21":"pf"
                       }
     
-    
-    def __init__(self):
+    def __init__(self, push_to_db = False):
         # Have checks on session to see if the request was successful.
         if not self.session:
             self.session = YahooOAuth().session
         self.getLeagueKey()
         self.entityManager = EntityManager()
-    
-    # Receives the XML data from the scraping, and returns the necessary data given the lookup key in the xml file. 
-    def parseXml(self, data, key):
-        pass
-    # Catching the error for parse xml would be root Element having error tag.
+        self.push_to_db = push_to_db
     
     def getGameKey(self, year=2013):
         year_str = str(year)
@@ -69,20 +61,29 @@ class NBAScrapeBase(object):
 # Defines the class for executing periodic scraping
 class NBAPeriodicScrape(NBAScrapeBase):
     
-    def __init__(self):
+    LIMIT = 400
+    
+    def __init__(self, *args, **kwargs):
         super(NBAPeriodicScrape,self).__init__()
+        # Format URL first
+        self.formatURL(**kwargs)
         # Scrape all player data for now 
         self.parseData()
+        if self.push_to_db is True:
+            self.addData()
+    
+    def formatURL(self, **kwargs):
+        # This will format the urls based on incoming data
+        # Return will be null, and we will pull the player_list_url with only formatting on the start for counts
+        pass
     
     def parseData(self):
         # Parse the data, and send xml common to both player and stats
-        player_list_url = "http://fantasysports.yahooapis.com/fantasy/v2/game/nba/players;out=stats;sort=OR;start={0}"
-        # TODO: append to list where we are going to start. Otherwise we're going to be grabbing first 25 forever
-        LIMIT = 26
+        player_list_url = "http://fantasysports.yahooapis.com/fantasy/v2/game/{0}/players;out=stats;sort=OR;start={1}"
         self.players = []
         self.stats = []
-        for i in xrange(0,LIMIT, 25):
-            r = self.session.get(player_list_url.format(str(i)))
+        for i in xrange(0,self.LIMIT, 25):
+            r = self.session.get(player_list_url.format(str(self.getGameKey(),str(i))))
             root = ET.fromstring(r.text)
             player_list_xml = root[0][7]
             
@@ -150,4 +151,9 @@ class NBAPeriodicScrape(NBAScrapeBase):
             statObjList.append(statObj)
         # Now we return the stat object
         return statObjList
+    
+    def addData(self):
+        # Add players (if existing), and stats (if existing?)
+        self.entityManager.addObjectListIfNotExisting(self.players)
+        self.entityManager.addObjectList(self.stats)
 

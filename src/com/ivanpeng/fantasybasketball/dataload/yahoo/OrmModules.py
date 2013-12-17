@@ -9,6 +9,7 @@ from sqlalchemy import Column, Integer, String, Float, Boolean, Date, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import types
 
 # Linux has user/pw of root/<blank> while windows is ivan/watershipdown
 engine = create_engine("mysql+mysqldb://root:@localhost", echo=True)
@@ -16,6 +17,32 @@ engine.execute("CREATE DATABASE IF NOT EXISTS nba_db2")
 engine.execute("USE nba_db2")
 Base = declarative_base()
 logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
+
+# Season, monthly, or weekly, or daily
+LENGTH_CHOICES = (('S', 'Season'),
+                  ('M', 'Monthly'),
+                  ('W', 'Weekly'),
+                  ('D', 'Daily'))
+STAT_CHOICES = (('TOT','Total'),
+                ('PG','PerGame'),
+                ('P48','Per48'),
+                ('P36','Per36'))
+
+class ChoiceType(types.TypeDecorator):
+
+    impl = types.String(3)
+
+    def __init__(self, choices, **kw):
+        self.choices = dict(choices)
+        super(ChoiceType, self).__init__(**kw)
+
+    def process_bind_param(self, value, dialect):
+        return [k for k, v in self.choices.iteritems() if v == value][0]
+
+    def process_result_value(self, value, dialect):
+        return self.choices[value]
+
+
 
 class FantasyLeague(Base):
     __tablename__ = 'FantasyLeague'
@@ -47,13 +74,10 @@ class NBATeam(Base):
 
 class Player(Base):
     __tablename__ = 'Player'
-    id = Column(Integer, primary_key = True, nullable = False)
+    yahooID = Column(Integer, primary_key = True, nullable=False)
     name = Column(String(100), nullable = False)
     # Do we want YahooId to be referencing Yahoo Tables?
-    yahooID = Column(Integer)
     positions = Column(String(15), nullable = False)
-    # One to many relationship
-    #player_stats = relationship("Stats")
     team_id = Column(Integer, ForeignKey("NBATeam.id"))
     team = relationship("NBATeam")
     
@@ -69,15 +93,15 @@ Identifiers to distinguish data: Year, length of stat (daily, weekly, season), d
 class Stats(Base):
     __tablename__ = 'NBA_Stats'
     id = Column(Integer, primary_key = True)
-    player_id = Column(Integer, ForeignKey("Player.id"))
+    player_id = Column(Integer, ForeignKey("Player.yahooID"))
     player = relationship("Player")
     # Configuration stats first: identify this stats column
     year = Column(Integer, nullable=False) 
     # Daily stat, weekly stat, or season-long stat
-    typeLength = Column(Integer, nullable=False)
+    typeLength = Column(ChoiceType(LENGTH_CHOICES), nullable=False)
     # Not necessarily applicable
     gameDate = Column(Date)
-    typeStat = Column(Integer, nullable=False)
+    typeStat = Column(ChoiceType(STAT_CHOICES), nullable=False)
     
     gp = Column(Float, nullable=False)
     gs = Column(Float, nullable=False)
@@ -115,9 +139,18 @@ class EntityManager:
         self.cur = Session()
     
     def addObjectList(self, objList):
-        self.cur.addall(objList)
+        self.cur.add_all(objList)
         self.cur.commit()
     
     def addObject(self, obj):
         self.cur.add(obj)
         self.cur.commit()
+    
+    def addObjectIfNotExisting(self, obj):
+        self.cur.merge(obj)
+        self.cur.commit()
+    
+    def addObjectListIfNotExisting(self, objList):
+        for obj in objList:
+            self.addObjectIfNotExisting(obj)
+        
