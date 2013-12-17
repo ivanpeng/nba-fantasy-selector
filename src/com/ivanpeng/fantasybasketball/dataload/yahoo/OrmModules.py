@@ -103,9 +103,9 @@ class Stats(Base):
     gameDate = Column(Date)
     typeStat = Column(ChoiceType(STAT_CHOICES), nullable=False)
     
-    gp = Column(Float, nullable=False)
-    gs = Column(Float, nullable=False)
-    mp = Column(Float, nullable=False)
+    gp = Column(Float)
+    gs = Column(Float)
+    mp = Column(Float)
     
     fgm = Column(Float, nullable = False)
     fga = Column(Float, nullable = False)
@@ -114,16 +114,16 @@ class Stats(Base):
     ftm = Column(Float, nullable = False)
     ftp = Column(Float, nullable = False) 
     fgm3 = Column(Float, nullable = False)
-    fga3 = Column(Float, nullable = False)
-    fgp3 = Column(Float, nullable = False)
-    oreb = Column(Float, nullable = False)
-    dreb = Column(Float, nullable = False)
+    fga3 = Column(Float)
+    fgp3 = Column(Float)
+    oreb = Column(Float)
+    dreb = Column(Float)
     reb = Column(Float, nullable = False)
     ast = Column(Float, nullable = False)
     stl = Column(Float, nullable = False)
     blk = Column(Float, nullable = False)
     tov = Column(Float, nullable = False)
-    pf = Column(Float, nullable = False)
+    pf = Column(Float)
     pts = Column(Float, nullable = False)
     
     # Extra stats here? Efficiency
@@ -150,7 +150,12 @@ class EntityManager:
         self.cur.merge(obj)
         self.cur.commit()
     
-    def addObjectListIfNotExisting(self, objList):
+    def addObjectListIfNotExisting(self, objList, isObjListUnique = True):
         for obj in objList:
-            self.addObjectIfNotExisting(obj)
+            if isObjListUnique is False:
+                self.addObjectIfNotExisting(obj)
+                pass
+            else:
+                self.cur.merge(obj)
+        self.cur.commit()
         

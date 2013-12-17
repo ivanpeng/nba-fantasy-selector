@@ -39,6 +39,10 @@ class NBAScrapeBase(object):
                       "19":"tov",
                       "21":"pf"
                       }
+    special_statkey_map ={
+                      "9004003":"fgm/fga",
+                      "9007006":"ftm/fta"
+                      }
     
     def __init__(self, push_to_db = False):
         # Have checks on session to see if the request was successful.
@@ -54,7 +58,7 @@ class NBAScrapeBase(object):
     
     def getLeagueKey(self):
         # Remember to format this.
-        league_key_url = "http://fantasysports.yahooapis.com/fantasy/v2/users;use_login=1/games;game_keys={0}/leagues"
+        league_key_url = "http://fantasysports.yahooapis.com/fantasy/v2/users;use_login=1/games;game_keys=322/leagues"
         self.league_key_url = self.session.get(league_key_url.format(self.getGameKey()))
     
     
