@@ -58,7 +58,7 @@ class Player(Base):
     team = relationship("NBATeam")
     
     def __repr__(self):
-        return self.name
+        return "Player: " + self.name
 
 '''
 The bread and butter of this class. I envision this to be a flat-table like structure for data, where all player data for each 

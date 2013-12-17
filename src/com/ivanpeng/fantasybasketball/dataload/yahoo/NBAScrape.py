@@ -8,13 +8,14 @@ from OrmModules import EntityManager
 from YahooOauth import YahooOAuth
 import xml.etree.ElementTree as ET
 
-
-
 key_prefix = "{http://fantasysports.yahooapis.com/fantasy/v2/base.rng}"
+
+def getNBAData():
+    nbascrape = NBAPeriodicScrape()
 
 # Base class for scraping data off Yahoo Fantasy Basketball API
 class NBAScrapeBase(object):
-    session = YahooOAuth().session
+    session = None
     game_years_map = {"2001":16, "2002": 67, "2003": 95, "2004":112, "2005":131,
                       "2006":165, "2007": 187, "2008": 211, "2009":234, "2010":249,
                       "2011":265, "2012": 304, "2013":322
@@ -38,7 +39,7 @@ class NBAScrapeBase(object):
                       "16":"ast",
                       "17":"stl",
                       "18":"blk",
-                      "19":"to",
+                      "19":"tov",
                       "21":"pf"
                       }
     
@@ -77,7 +78,7 @@ class NBAPeriodicScrape(NBAScrapeBase):
         # Parse the data, and send xml common to both player and stats
         player_list_url = "http://fantasysports.yahooapis.com/fantasy/v2/game/nba/players;out=stats;sort=OR;start={0}"
         # TODO: append to list where we are going to start. Otherwise we're going to be grabbing first 25 forever
-        LIMIT = 400
+        LIMIT = 26
         self.players = []
         self.stats = []
         for i in xrange(0,LIMIT, 25):
@@ -123,7 +124,7 @@ class NBAPeriodicScrape(NBAScrapeBase):
             season = statsXml.find(key_prefix+"season").text
             coverageType = statsXml.find(key_prefix+"coverage_type").text
             
-            statMap = {'player': player}
+            statMap = {'player': player[0]}
             statMap['year'] = season
             if coverageType == 'season':
                 statMap['typeLength'] = 0 # season
@@ -136,9 +137,9 @@ class NBAPeriodicScrape(NBAScrapeBase):
             
             for statXml in statsXml:
                 # We have a custom mapping on stats; loop through all of them, see if the id exists in our map, and then grab it
-                statId = statXml.find(key_prefix+"stat_id")
-                statValue = statId.find(key_prefix+"value")
-                if (statId in self.statkey_var_map):
+                statId = statXml.find(key_prefix+"stat_id").text
+                statValue = statXml.find(key_prefix+"value").text
+                if (str(statId) in self.statkey_var_map):
                     # Get var name, and put it in dict with statId value
                     varName = self.statkey_var_map[statId]
                     if (statValue is not None and statValue != '-'):
