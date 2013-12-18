@@ -34,16 +34,26 @@ class YahooOAuth():
 
     def __init__(self):
         try:
-            request_token, request_token_secret = self.yahoo.get_request_token(data = {'oauth_callback': 'oob'})
-            auth_url = self.yahoo.get_authorize_url(request_token)
+            self.request_token, self.request_token_secret = self.yahoo.get_request_token(data = {'oauth_callback': 'oob'})
+            auth_url = self.yahoo.get_authorize_url(self.request_token)
             # TODO: can we hit with urllib2.urlopen?
             #urllib2.urlopen(auth_url)
             print "Visit this in your browser: " + auth_url
             pin = raw_input('Enter PIN from your browser: ' )
             # Enter pin
-            self.session = self.yahoo.get_auth_session(request_token, request_token_secret, data={'oauth_verifier': pin})
+            self.session = self.yahoo.get_auth_session(self.request_token, self.request_token_secret, data={'oauth_verifier': pin})
+            self.access_token = self.session.access_token
+            self.access_token_secret = self.session.access_token_secret
+            
         except YahooOAuthException:
             print "Error caught. Please check stack trace"
+        
+    # Make YahooOAuth a decorator to this to enable refresh token compatibilities.
+    # This is going to use 
+    def refresh_token(self):
+        self.access_token, self.access_token_secret = self.yahoo.get_access_token(self.access_token, self.access_token_secret)
+        self.session = self.yahoo.get_auth_session((self.access_token, self.access_token_secret))
+
         
     def sanityCheck(self):
         r = self.session.get('http://fantasysports.yahooapis.com/fantasy/v2/game/nba')
@@ -53,5 +63,14 @@ class YahooOAuth():
     # This simple function is used to take the input url and then append the signature signoffs, along with oauth tokens.
     def getFormattedURL(self, reqURL):
         return self.session.get(reqURL).request().url
-        
+    
+    def get(self, url):
+        # TODO: check if session exists, and if url is valid
+        resp = self.session.get(url)
+        if resp.status_code == 401:
+            # Token expired
+            print "Token expired!"
+            #self.refresh_token()
+            #resp = self.session.get(url)
+        return resp
         

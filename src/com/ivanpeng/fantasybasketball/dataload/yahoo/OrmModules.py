@@ -98,6 +98,9 @@ class Stats(Base):
     # Configuration stats first: identify this stats column
     year = Column(Integer, nullable=False) 
     # Daily stat, weekly stat, or season-long stat
+    # TODO: For daily and weekly stat lines, we will need to scrawl yahoo data on our own because their data is shit.
+    # TODO: We can grab the season data so far with each player, we can see how that changes per day.
+    # Other suggestions include figuring out URLs in league context.
     typeLength = Column(ChoiceType(LENGTH_CHOICES), nullable=False)
     # Not necessarily applicable
     gameDate = Column(Date)
