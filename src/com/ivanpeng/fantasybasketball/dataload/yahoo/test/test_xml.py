@@ -20,12 +20,19 @@ class MockRetrieveXml(NBAPeriodicScrape):
     def parseData(self):
         self.players = []
         self.stats = []
+        self.nba_teams = []
+        self.entityManager = MockEntityManager()
         root = ET.parse("playerXmlTest.xml").getroot()
         player_list_xml = root[0][7]
         self.players = self.getPlayerData(player_list_xml)
         # Send in same template for programming aesthetics
         # eventually, you want to set this to be broad, and then override this with different stats parameters
         self.stats = self.getPlayerStats(player_list_xml)
+        
+class MockEntityManager(object):
+    
+    def addObject(self, object):
+        pass
 
 class TestNBAScraping(unittest.TestCase):
     def setUp(self):
@@ -41,6 +48,7 @@ class TestNBAScraping(unittest.TestCase):
         self.assertEqual(player.name, 'Kevin Durant')
         self.assertEqual(str(playerstat), 'Stats object for Player: Kevin Durant')
         
+        print playerstat.id, playerstat.player_id
         # Assert playerstat has objects
         
         # TODO: test wrong parsing information - what can go wrong? what values can be null?       

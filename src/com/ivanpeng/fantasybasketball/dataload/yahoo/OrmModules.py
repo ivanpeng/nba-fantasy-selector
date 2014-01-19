@@ -4,32 +4,34 @@ Created on 2013-12-06
 @author: ivan
 '''
 import logging
-from sqlalchemy import Column, Integer, String, Float, Boolean, Date, ForeignKey, \
-    create_engine
+import datetime
+
+from sqlalchemy import Column, Integer, String, Float, Boolean, Date, DateTime, ForeignKey, \
+    create_engine, types
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, backref
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import types
+from sqlalchemy.orm import relationship, backref, sessionmaker
+
 
 # Linux has user/pw of root/<blank> while windows is ivan/watershipdown
-engine = create_engine("mysql+mysqldb://root:@localhost", echo=True)
+#engine = create_engine("mysql+mysqldb://root:@localhost", echo=True)
+engine = create_engine("mysql+mysqldb://ivan:watershipdown@localhost", echo=True)
+#engine.execute("drop database if exists nba_db2")
 engine.execute("CREATE DATABASE IF NOT EXISTS nba_db2")
 engine.execute("USE nba_db2")
 Base = declarative_base()
 logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 
 # Season, monthly, or weekly, or daily
-LENGTH_CHOICES = (('S', 'Season'),
-                  ('M', 'Monthly'),
-                  ('W', 'Weekly'),
-                  ('D', 'Daily'))
-STAT_CHOICES = (('TOT','Total'),
-                ('PG','PerGame'),
-                ('P48','Per48'),
-                ('P36','Per36'))
+LENGTH_CHOICES = (('S', 'SEASON'),
+                  ('M', 'MONTHLY'),
+                  ('W', 'WEEKLY'),
+                  ('D', 'DAILY'))
+STAT_CHOICES = (('TOT','TOTAL'),
+                ('PG','PERGAME'),
+                ('P48','PER48'),
+                ('P36','PER36'))
 
 class ChoiceType(types.TypeDecorator):
-
     impl = types.String(3)
 
     def __init__(self, choices, **kw):
@@ -57,7 +59,7 @@ class FantasyTeam(Base):
     team_id = Column(Integer, primary_key = True)
     league_id = Column(Integer, ForeignKey('FantasyLeague.id'))
     league = relationship("FantasyLeague")
-    player_id = Column(Integer, ForeignKey('Player.id'))
+    player_id = Column(Integer, ForeignKey('Player.yahooID'))
     player = relationship("Player")
 
     def __repr__(self):
@@ -67,7 +69,7 @@ class NBATeam(Base):
     __tablename__ = 'NBATeam'
     id = Column(Integer, primary_key=True)
     name = Column(String(100), nullable = False)
-    isPlayoffTeam = Column(Boolean)
+    isPlayoffTeam = Column(Boolean, default= False)
     
     def __repr__(self):
         return self.name
@@ -128,6 +130,8 @@ class Stats(Base):
     tov = Column(Float, nullable = False)
     pf = Column(Float)
     pts = Column(Float, nullable = False)
+    
+    entered_on = Column(DateTime, default=datetime.datetime.now());
     
     # Extra stats here? Efficiency
     

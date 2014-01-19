@@ -3,10 +3,14 @@ Created on 2013-12-06
 
 @author: ivan
 '''
-from OrmModules import Player, Stats
-from OrmModules import EntityManager
+import datetime
+
+from OrmModules import EntityManager, Player, Stats, NBATeam
 from YahooOauth import YahooOAuth
+from com.ivanpeng.fantasybasketball.dataload.yahoo.OrmModules import \
+    LENGTH_CHOICES, STAT_CHOICES
 import xml.etree.ElementTree as ET
+
 
 key_prefix = "{http://fantasysports.yahooapis.com/fantasy/v2/base.rng}"
 
@@ -50,6 +54,8 @@ class NBAScrapeBase(object):
             self.session = YahooOAuth().session
         self.getLeagueKey()
         self.entityManager = EntityManager()
+        self.getTeams()
+        #self.getPlayers()
         self.push_to_db = push_to_db
     
     def getGameKey(self, year=2013):
@@ -60,6 +66,12 @@ class NBAScrapeBase(object):
         # Remember to format this.
         league_key_url = "http://fantasysports.yahooapis.com/fantasy/v2/users;use_login=1/games;game_keys=322/leagues"
         self.league_key_url = self.session.get(league_key_url.format(self.getGameKey()))
+        
+    def getTeams(self):
+        self.nba_teams = self.entityManager.cur.query(NBATeam).all()
+        
+    def getPlayers(self):
+        self.players = self.entityManager.cur.query(Player).all()
     
     
 # Defines the class for executing periodic scraping
@@ -67,7 +79,7 @@ class NBAPeriodicScrape(NBAScrapeBase):
     
     LIMIT = 400
     
-    def __init__(self, *args, **kwargs):
+    def __init__(self, push_to_db = False, **kwargs):
         super(NBAPeriodicScrape,self).__init__()
         # Format URL first
         self.formatURL(**kwargs)
@@ -87,7 +99,7 @@ class NBAPeriodicScrape(NBAScrapeBase):
         self.players = []
         self.stats = []
         for i in xrange(0,self.LIMIT, 25):
-            r = self.session.get(player_list_url.format(str(self.getGameKey(),str(i))))
+            r = self.session.get(player_list_url.format(str(self.getGameKey()), str(i)))
             root = ET.fromstring(r.text)
             player_list_xml = root[0][7]
             
@@ -110,7 +122,9 @@ class NBAPeriodicScrape(NBAScrapeBase):
             # Possibly need to join playerpositions to string
             playerPositionsStr = ",".join(playerPositions)
             
-            playerTeam = player.find(key_prefix+"editorial_team_full_name").text
+            playerTeamName = player.find(key_prefix+"editorial_team_full_name").text
+            # Get or create team name with playerTeamName
+            playerTeam = self.get_or_create_team(playerTeamName)
             # Declare object now
             p = Player(name = playerName,
                        yahooID = playerYahooID,
@@ -129,11 +143,12 @@ class NBAPeriodicScrape(NBAScrapeBase):
             season = statsXml.find(key_prefix+"season").text
             coverageType = statsXml.find(key_prefix+"coverage_type").text
             
-            statMap = {'player': player[0]}
+            statMap = {'player_id': player[0].yahooID}
+            statMap['entered_on'] = str(datetime.datetime.now())
             statMap['year'] = season
             if coverageType == 'season':
-                statMap['typeLength'] = 0 # season
-                statMap['typeStat'] = 0 # Totals
+                statMap['typeLength'] = 'SEASON' # season
+                statMap['typeStat'] = 'TOTAL' # Totals
             # Need else here
             
             # Now traverse into stat array, and then loop
@@ -156,8 +171,25 @@ class NBAPeriodicScrape(NBAScrapeBase):
         # Now we return the stat object
         return statObjList
     
+    def get_or_create_team(self, team_name, is_playoff_team = False):
+        # Here, check if team name exists in list, otherwise add to current list
+        for team in self.nba_teams:
+            if team.name == team_name:
+                return team
+        
+        # Not found in the list; add it to self.nba_teams and then return that object
+        new_team = NBATeam(name = team_name, isPlayoffTeam = is_playoff_team)
+        self.nba_teams.append(new_team)
+        self.entityManager.addObject(new_team)
+        return new_team
+        
+    
+    
     def addData(self):
         # Add players (if existing), and stats (if existing?)
         self.entityManager.addObjectListIfNotExisting(self.players)
         self.entityManager.addObjectList(self.stats)
 
+
+retriever = NBAPeriodicScrape()
+retriever.addData()
