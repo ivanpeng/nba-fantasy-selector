@@ -3,7 +3,9 @@ Created on 2013-12-06
 
 @author: ivan
 '''
+from datetime import date, timedelta
 import datetime
+import logging
 
 from OrmModules import EntityManager, Player, Stats, NBATeam
 from YahooOauth import YahooOAuth
@@ -48,6 +50,8 @@ class NBAScrapeBase(object):
                       "9007006":"ftm/fta"
                       }
     
+    percentages_stats = ["fgp", "ftp", "fgp3"]
+    
     def __init__(self, push_to_db = False):
         # Have checks on session to see if the request was successful.
         if not self.session:
@@ -82,16 +86,84 @@ class NBAPeriodicScrape(NBAScrapeBase):
     def __init__(self, push_to_db = False, **kwargs):
         super(NBAPeriodicScrape,self).__init__()
         # Format URL first
-        self.formatURL(**kwargs)
+        self.getHistoricalData()
         # Scrape all player data for now 
         self.parseData()
-        if self.push_to_db is True:
+        self.calculateTimeDiff()
+        if push_to_db:
+            print "Pushing to DB..."
             self.addData()
     
     def formatURL(self, **kwargs):
         # This will format the urls based on incoming data
         # Return will be null, and we will pull the player_list_url with only formatting on the start for counts
         pass
+    
+    def getHistoricalData(self, time = datetime.datetime.now()):
+        # Grab the date, do date subtraction
+        d = time.date()-timedelta(days=2)
+        # Query
+        self.yesterday_stats = self.entityManager.cur.query(Stats).filter_by(gameDate = d).all()
+        # Get player set in data in case there are new players added
+        self.yesterday_players = self.entityManager.cur.query(Player).filter(Player.yahooID.in_([x.player_id for x in self.yesterday_stats])).all()
+        
+        logging.info("Historical data. Players from yesterday: " + str(len(self.yesterday_players)))
+        
+    def calculateTimeDiff(self, doCalculate = True):
+        self.difference_list = []
+        # This function matches up the player ids, and the dates, and does subtraction if necessary
+        for yesterday_player in self.yesterday_players:
+            # Find if there is set intersection between today's players and yesterday's players
+            if str(yesterday_player.yahooID) in [x.yahooID for x in self.players]:
+                # Find stat ids in both lists, and compare dates. If difference is 1, then do difference stat
+                yesterday_stat = next(x for x in self.yesterday_stats if x.player_id == yesterday_player.yahooID)
+                today_stat = next(x for x in self.stats if x.player_id == str(yesterday_player.yahooID))
+                print "Yesterday: " + str(yesterday_stat) + ", Today: " + str(today_stat)
+                isDifferent, difference = self.diffStats(yesterday_stat, today_stat)
+                if isDifferent:
+                    # True! Add difference to a list, for input into data
+                    self.difference_list.append(difference);
+                
+    
+    def diffStats(self, yesterday, today):
+        # Find the difference betweeen the stats, and then return a tuple checking for if different, and the stat object of difference
+        var_values = self.statkey_var_map.values()
+        isDifferent = False;
+        statMap = {}
+        statMap['player_id'] = yesterday.player_id
+        statMap['year'] = yesterday.year
+        statMap['typeLength'] = 'DAILY'
+        statMap['gameDate'] = today.gameDate
+        statMap['typeStat'] = 'TOTAL'
+        statMap['entered_on'] = datetime.datetime.now()
+        
+        print "Calculating differing stats for " + str(yesterday)
+        if int(today.gp) - int(yesterday.gp) != 0:
+            isDifferent = True
+        if isDifferent == True:
+            for var in var_values:
+                if var not in self.percentages_stats:
+                    val = float(getattr(today, var)) - float(getattr(yesterday, var))
+                elif var == "fgp":
+                    if (int(today.fga)- int(yesterday.fga) > 0):
+                        val = (float(today.fgm)-float(yesterday.fgm))/(float(today.fga)-float(yesterday.fga))
+                    else:
+                        val = 0;
+                elif var == "ftp":
+                    if (int(today.fta)- int(yesterday.fta) > 0):
+                        val = (float(today.ftm)-float(yesterday.ftm))/(float(today.fta)-float(yesterday.fta))
+                    else:
+                        val = 0;
+                elif var == "fgp3":
+                    if (int(today.fga3)- int(yesterday.fga3) > 0):
+                        val = (float(today.fgm3)-float(yesterday.fgm3))/(float(today.fga3)-float(yesterday.fga3))
+                    else:
+                        val = 0;
+                statMap[var] = val
+            statObj = Stats(**statMap)
+            return isDifferent,statObj
+        else:
+            return isDifferent, None
     
     def parseData(self):
         # Parse the data, and send xml common to both player and stats
@@ -107,9 +179,7 @@ class NBAPeriodicScrape(NBAScrapeBase):
             # Send in same template for programming aesthetics
             # eventually, you want to set this to be broad, and then override this with different stats parameters
             self.stats.extend(self.getPlayerStats(player_list_xml))
-        print self.players[:75]
-        print self.stats[:75]
-    
+
     def getPlayerData(self, playerListXml):        
         # Player data
         playerObjList = []
@@ -144,8 +214,11 @@ class NBAPeriodicScrape(NBAScrapeBase):
             coverageType = statsXml.find(key_prefix+"coverage_type").text
             
             statMap = {'player_id': player[0].yahooID}
-            statMap['entered_on'] = str(datetime.datetime.now())
+            
             statMap['year'] = season
+            #statMap['gameDate'] = datetime.date()-timedelta(days=1)
+            #statMap['gameDate'] = datetime.date.today()
+            statMap['entered_on'] = str(datetime.datetime.now())
             if coverageType == 'season':
                 statMap['typeLength'] = 'SEASON' # season
                 statMap['typeStat'] = 'TOTAL' # Totals
@@ -183,13 +256,11 @@ class NBAPeriodicScrape(NBAScrapeBase):
         self.entityManager.addObject(new_team)
         return new_team
         
-    
-    
     def addData(self):
         # Add players (if existing), and stats (if existing?)
         self.entityManager.addObjectListIfNotExisting(self.players)
         self.entityManager.addObjectList(self.stats)
+        self.entityManager.addObjectList(self.difference_list)
 
 
-retriever = NBAPeriodicScrape()
-retriever.addData()
+retriever = NBAPeriodicScrape(push_to_db=True)

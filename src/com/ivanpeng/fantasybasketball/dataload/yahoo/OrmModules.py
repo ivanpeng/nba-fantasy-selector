@@ -96,7 +96,7 @@ class Stats(Base):
     __tablename__ = 'NBA_Stats'
     id = Column(Integer, primary_key = True)
     player_id = Column(Integer, ForeignKey("Player.yahooID"))
-    player = relationship("Player")
+    player = relationship("Player",backref="player")
     # Configuration stats first: identify this stats column
     year = Column(Integer, nullable=False) 
     # Daily stat, weekly stat, or season-long stat
